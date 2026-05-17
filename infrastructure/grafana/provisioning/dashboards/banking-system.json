@@ -1,0 +1,267 @@
+{
+  "title": "Banking Service — 4 Golden Signals SRE",
+  "description": "Минимальный дашборд с четырьмя золотыми сигналами: Latency, Traffic, Errors, Saturation. Фильтр по эндпоинтам.",
+  "tags": ["sre", "golden-signals", "fastapi", "ai-sre"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 0,
+        "includeAll": true,
+        "label": "Endpoint",
+        "multi": true,
+        "name": "handler",
+        "options": [],
+        "query": "label_values(http_requests_total, handler)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "query"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "id": 1,
+      "title": "4 Golden Signals — обзор",
+      "type": "row",
+      "collapsed": false
+    },
+
+    {
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 7 },
+      "title": "Traffic (RPS)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (handler) (rate(http_requests_total{handler=~\"$handler\"}[$__rate_interval]))",
+          "legendFormat": "{{handler}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      }
+    },
+
+    {
+      "gridPos": { "x": 6, "y": 1, "w": 6, "h": 7 },
+      "title": "Errors (доля 4xx+5xx)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{handler=~\"$handler\", status=~\"4..|5..\"}[$__rate_interval])) / ignoring(status) sum(rate(http_requests_total{handler=~\"$handler\"}[$__rate_interval]))",
+          "legendFormat": "Error rate",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "gridPos": { "x": 12, "y": 1, "w": 6, "h": 7 },
+      "title": "Latency — p95 / p99",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{handler=~\"$handler\"}[$__rate_interval])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{handler=~\"$handler\"}[$__rate_interval])))",
+          "legendFormat": "p99",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.4 },
+              { "color": "red", "value": 1.2 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "gridPos": { "x": 18, "y": 1, "w": 6, "h": 7 },
+      "title": "Saturation (активные запросы)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(banking_active_requests{handler=~\"$handler\"})",
+          "legendFormat": "{{handler}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 15 },
+              { "color": "red", "value": 40 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "gridPos": { "x": 0, "y": 21, "w": 8, "h": 7 },
+      "title": "CPU Usage % (host)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "legendFormat": "CPU %",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 75 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "gridPos": { "x": 8, "y": 21, "w": 8, "h": 7 },
+      "title": "Memory Used % (host)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+          "legendFormat": "Memory %",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 75 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "gridPos": { "x": 16, "y": 21, "w": 8, "h": 7 },
+      "title": "Memory Used (GB)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / 1024 / 1024 / 1024",
+          "legendFormat": "Used GB",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "gbytes" }
+      }
+    },
+
+    {
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 1 },
+      "title": "Детализация по эндпоинтам (опционально)",
+      "type": "row",
+      "collapsed": true
+    },
+
+    {
+      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 8 },
+      "title": "RPS + ошибки по эндпоинтам (stack)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (handler, status) (rate(http_requests_total{handler=~\"$handler\", status!~\"2..\"}[$__rate_interval]))",
+          "legendFormat": "{{handler}} · {{status}} (error)",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (handler) (rate(http_requests_total{handler=~\"$handler\"}[$__rate_interval]))",
+          "legendFormat": "{{handler}} · all",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "stacking": { "mode": "normal" } }
+        }
+      }
+    },
+
+    {
+      "gridPos": { "x": 12, "y": 9, "w": 12, "h": 8 },
+      "title": "Latency heatmap (все эндпоинты)",
+      "type": "heatmap",
+      "targets": [
+        {
+          "expr": "sum by (le) (increase(http_request_duration_seconds_bucket{handler=~\"$handler\"}[$__rate_interval]))",
+          "format": "heatmap",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "yAxis": { "unit": "s", "logBase": 10 },
+        "color": { "scheme": "Oranges" }
+      }
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {}
+}

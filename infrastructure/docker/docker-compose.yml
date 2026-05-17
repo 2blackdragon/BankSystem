@@ -1,0 +1,93 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: banking-db
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-bank}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bank}
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+
+  app:
+    build:
+      context: ../../
+      dockerfile: infrastructure/docker/Dockerfile
+    container_name: banking-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../../.env
+    volumes:
+      - ../../:/BankSystem
+      - prometheus_multiproc:/tmp/prometheus
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_DB=${POSTGRES_DB:-bank}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-bank}
+      - PYTHONPATH=/BankSystem
+    working_dir: /BankSystem
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: banking-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      # Исправленный путь к prometheus.yml
+      - ../../infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    depends_on:
+      - app
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: banking-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      # Монтируем всю папку provisioning
+      - ../../infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    depends_on:
+      - prometheus
+  
+  node-exporter:
+    image: prom/node-exporter
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+
+volumes:
+  pgdata:
+  prometheus_multiproc:
+  prometheus_data:
+  grafana_data:
