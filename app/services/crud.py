@@ -6,7 +6,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from datetime import datetime
 
-from app.chaos.failures import inject_random_failure
 from app.db.models import User, Account, Transaction
 from app.schemas.schemas import (
     UserRequest, 
@@ -181,9 +180,7 @@ async def create_transfer(db: AsyncSession, transfer: TransferRequest) -> Transa
     from_acc.balance -= transfer.amount
     to_acc.balance += transfer.amount
 
-    db.add(db_tx)  # убрал await
-
-    inject_random_failure()
+    db.add(db_tx)
 
     try:
         await db.commit()

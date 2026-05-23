@@ -36,6 +36,14 @@ async def latency_chaos_middleware(request: Request, call_next):
 
 
 @app.middleware("http")
+async def chaos_middleware(request: Request, call_next):
+    if request.headers.get("X-Inject-Failure") == "true":
+        raise RuntimeError("Injected chaos failure")
+
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def saturation_middleware(request: Request, call_next):
     # Более надёжный способ получить путь
     handler = request.url.path
