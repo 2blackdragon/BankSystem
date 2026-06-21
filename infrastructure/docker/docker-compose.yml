@@ -21,6 +21,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-bank}
       POSTGRES_USER: ${POSTGRES_USER:-user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    networks:
+      - banking_network
 
   app:
     build:
@@ -46,6 +48,8 @@ services:
       - PYTHONPATH=/BankSystem
     working_dir: /BankSystem
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    networks:
+      - banking_network
 
   prometheus:
     image: prom/prometheus:v2.55.0
@@ -62,6 +66,8 @@ services:
       - '--storage.tsdb.path=/prometheus'
     depends_on:
       - app
+    networks:
+      - banking_network
 
   grafana:
     image: grafana/grafana:11.3.0
@@ -79,15 +85,24 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     depends_on:
       - prometheus
-  
+    networks:
+      - banking_network
+
   node-exporter:
     image: prom/node-exporter
     container_name: node-exporter
     ports:
       - "9100:9100"
+    networks:
+      - banking_network
 
 volumes:
   pgdata:
   prometheus_multiproc:
   prometheus_data:
   grafana_data:
+
+networks:
+  banking_network:
+    driver: bridge
+    name: banking_network
